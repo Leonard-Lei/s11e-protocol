@@ -1,4 +1,5 @@
 import "@nomicfoundation/hardhat-toolbox";
+import "@openzeppelin/hardhat-upgrades";
 import { config as dotenvConfig } from "dotenv";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
@@ -8,6 +9,8 @@ import type { NetworkUserConfig } from "hardhat/types";
 import "./tasks/accounts";
 import "./tasks/lock";
 
+// 禁用 dotenv 的控制台输出（避免 flatten 时包含日志）
+process.env.DOTENV_CONFIG_QUIET = "true";
 dotenvConfig();
 
 const mnemonic: string = process.env.MNEMONIC || "";

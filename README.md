@@ -203,6 +203,15 @@ Deploy a new instance of the Lock contract via a task:
 npm run task:deployLock --unlock 100 --value 0.1
 ```
 
+### flatten 智能合约
+
+```shell
+# 在终端中打印
+npx hardhat flatten
+# 展开特定文件
+npx hardhat flatten contracts/EUROCash.sol > flattenContract/EUROCashAll.sol
+```
+
 ### Syntax Highlighting
 
 If you use VSCode, you can get Solidity syntax highlighting with the
