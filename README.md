@@ -108,6 +108,17 @@ REPORT_GAS=false
 
 Compile the smart contracts with Hardhat:
 
+```json
+// package.json
+"dependencies": {
+"@confluxfans/contracts": "^0.2.7",
+"@solvprotocol/erc-3525": "^1.1.0"
+}
+# 拷贝conflux，由于conflux引入的Openzepplin库路径有问题需要手动修改
+cp -r third_modules/@0xsequence node_modules
+cp -r third_modules/@confluxfans node_modules/
+```
+
 ```sh
 npm run compile
 ```
@@ -173,6 +184,12 @@ npm run clean
 Deploy the contracts to Hardhat Network:
 
 ```sh
+# npx hardhat deploy --network <网络名称> --tags <标签>
+# Sepolia 测试网
+npx hardhat deploy --network sepolia --tags StandardERC20
+
+# Polygon Mumbai 测试网
+npx hardhat deploy --network polygon-mumbai --tags StandardERC20
 npm run deploy:contracts
 ```
 
