@@ -1,16 +1,17 @@
 import "@nomicfoundation/hardhat-toolbox";
+import { config as dotenvConfig } from "dotenv";
+import "hardhat-contract-sizer";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
-import { vars } from "hardhat/config";
 import type { NetworkUserConfig } from "hardhat/types";
 
 import "./tasks/accounts";
 import "./tasks/lock";
 
-// Run 'npx hardhat vars setup' to see the list of variables that need to be set
+dotenvConfig();
 
-const mnemonic: string = vars.get("MNEMONIC");
-const infuraApiKey: string = vars.get("INFURA_API_KEY");
+const mnemonic: string = process.env.MNEMONIC || "";
+const infuraApiKey: string = process.env.INFURA_API_KEY || "";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -55,14 +56,14 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      arbitrumOne: vars.get("ARBISCAN_API_KEY", ""),
-      avalanche: vars.get("SNOWTRACE_API_KEY", ""),
-      bsc: vars.get("BSCSCAN_API_KEY", ""),
-      mainnet: vars.get("ETHERSCAN_API_KEY", ""),
-      optimisticEthereum: vars.get("OPTIMISM_API_KEY", ""),
-      polygon: vars.get("POLYGONSCAN_API_KEY", ""),
-      polygonMumbai: vars.get("POLYGONSCAN_API_KEY", ""),
-      sepolia: vars.get("ETHERSCAN_API_KEY", ""),
+      arbitrumOne: process.env.ARBISCAN_API_KEY || "",
+      avalanche: process.env.SNOWTRACE_API_KEY || "",
+      bsc: process.env.BSCSCAN_API_KEY || "",
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+      optimisticEthereum: process.env.OPTIMISM_API_KEY || "",
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
     },
   },
   gasReporter: {
@@ -83,7 +84,7 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
       chainId: chainIds.ganache,
-      url: "http://localhost:8545",
+      url: "http://localhost:7545",
     },
     arbitrum: getChainConfig("arbitrum-mainnet"),
     avalanche: getChainConfig("avalanche"),
@@ -101,7 +102,7 @@ const config: HardhatUserConfig = {
     tests: "./test",
   },
   solidity: {
-    version: "0.8.19",
+    version: "0.8.27",
     settings: {
       metadata: {
         // Not including the metadata hash
@@ -115,6 +116,14 @@ const config: HardhatUserConfig = {
         runs: 800,
       },
     },
+  },
+
+  // Project Settings
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: !(process.env.SOLC_OPTIMIZER === "false"),
+    strict: true,
   },
   typechain: {
     outDir: "types",
