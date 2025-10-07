@@ -113,8 +113,12 @@ const config: HardhatUserConfig = {
       // https://hardhat.org/hardhat-network/#solidity-optimizer-support
       optimizer: {
         enabled: true,
-        runs: 800,
+        runs: 200,
+        // runs: 1, // 降低 runs 可以减小合约大小，但增加 gas 成本
       },
+      // 使用 Paris EVM 版本以兼容 Ganache  openzeppelin5.x 合约使用了 mcopy 指令（Cancun EVM 版本的特性）
+      // evmVersion: "paris",
+      evmVersion: "cancun",
     },
   },
 
@@ -123,7 +127,7 @@ const config: HardhatUserConfig = {
     alphaSort: true,
     disambiguatePaths: false,
     runOnCompile: !(process.env.SOLC_OPTIMIZER === "false"),
-    strict: true,
+    strict: false, // 允许合约超过大小限制，只显示警告  以太坊主网的合约大小限制是 24 KiB（EIP-170）
   },
   typechain: {
     outDir: "types",

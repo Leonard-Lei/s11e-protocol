@@ -5,18 +5,10 @@ pragma solidity >=0.8.20;
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC1363Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC1363Upgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {
-    ERC20BurnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import {
-    ERC20FlashMintUpgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20FlashMintUpgradeable.sol";
-import {
-    ERC20PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
-import {
-    ERC20PermitUpgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {ERC20FlashMintUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20FlashMintUpgradeable.sol";
+import {ERC20PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@confluxfans/contracts/InternalContracts/InternalContractsHandler.sol";
@@ -35,6 +27,7 @@ contract UpgradeableERC20 is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -73,7 +66,11 @@ contract UpgradeableERC20 is
      * @param _addPrivilege Whether to add privilege, if true, the recipient will be added to the privilege list
      * @return bool success
      */
-    function transfer(address _recipient, uint256 _amount, bool _addPrivilege) public returns (bool) {
+    function transfer(
+        address _recipient,
+        uint256 _amount,
+        bool _addPrivilege
+    ) public returns (bool) {
         _transfer(_msgSender(), _recipient, _amount);
         if (_addPrivilege) {
             address[] memory a = new address[](1);
@@ -100,15 +97,21 @@ contract UpgradeableERC20 is
      * @param _account The address of the account to add privilege
      * address = ["0x0000000000000000000000000000000000000000"] all pay
      */
-    function addPrivilege(address[] memory _account) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addPrivilege(
+        address[] memory _account
+    ) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
         InternalContracts.SPONSOR_CONTROL.addPrivilege(_account);
     }
 
-    function removePrivilege(address[] memory _account) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removePrivilege(
+        address[] memory _account
+    ) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
         InternalContracts.SPONSOR_CONTROL.removePrivilege(_account);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {}
 
     // The following functions are overrides required by Solidity.
 
@@ -122,9 +125,15 @@ contract UpgradeableERC20 is
 
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(AccessControlUpgradeable, ERC1363Upgradeable) returns (bool) {
+    )
+        public
+        view
+        override(AccessControlUpgradeable, ERC1363Upgradeable)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
+
 
     /**
      * @dev Allows all Ether transfers
@@ -132,7 +141,10 @@ contract UpgradeableERC20 is
     receive() external payable virtual {}
 
     function withdraw(uint256 _amount) external {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "must have admin role to withdraw");
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
+            "must have admin role to withdraw"
+        );
         require(_amount <= address(this).balance, "insufficient balance");
         payable(_msgSender()).transfer(_amount);
     }

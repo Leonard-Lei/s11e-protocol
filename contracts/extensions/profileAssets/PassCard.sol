@@ -1,0 +1,248 @@
+// SPDx-License-Identifier: Apache-2.0
+
+pragma solidity >=0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@confluxfans/contracts/InternalContracts/InternalContractsHandler.sol";
+import "../../erc6551/interfaces/IERC6551Registry.sol";
+import "../../erc6551/interfaces/IERC6551Account.sol";
+// import "../../erc6551/ERC6551Account.sol";
+import "../../utils/MinimalReceiver.sol";
+
+/**
+ * @dev s11e-protocol assets: PassCard asset
+ */
+contract PassCard is
+    ERC721,
+    ERC721Enumerable,
+    ERC721URIStorage,
+    ERC721Pausable,
+    AccessControl,
+    ERC721Burnable,
+    MinimalReceiver
+{
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    // tokenId --> account
+    mapping(uint256 => address) public tbaAccount;
+    // erc6551 registry contract address
+    IERC6551Registry public erc6551Registry;
+    // erc6551 account implementation contract address
+    address erc6551AccountImplementation;
+
+    string public baseURI;
+    uint256 public supply;
+
+    event MintEvent(uint256, address);
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _baseURI,
+        uint256 _supply,
+        address _erc6551Registry,
+        address _owner
+    ) ERC721(_name, _symbol) {
+        supply = _supply;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, _owner);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, _owner);
+        erc6551Registry = IERC6551Registry(_erc6551Registry);
+        baseURI = _baseURI;
+    }
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    /**
+     * @dev Sets the address of the ERC6551 registry
+     */
+    function setERC6551Registry(
+        address registry
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        erc6551Registry = IERC6551Registry(registry);
+    }
+
+    /**
+     * @dev  Sets the address of the ERC6551 account implementation
+     */
+    function setERC6551Implementation(
+        address implementation
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        erc6551AccountImplementation = implementation;
+    }
+
+    function mint(
+        address _to,
+        uint256 _tokenId,
+        string memory _tokenURI
+    ) external payable onlyRole(MINTER_ROLE) {
+        require(_tokenId > 0, "token id need > 0");
+        if (supply > 0) {
+            require(_tokenId < supply, "token id over supply");
+        }
+        uint256 salt = generateRandomSalt();
+        address accountAddress = erc6551Registry.createAccount(
+            address(this),
+            _tokenId,
+            salt
+        );
+        address expectedAddress = erc6551Registry.account(
+            address(this),
+            _tokenId,
+            salt
+        );
+        require(accountAddress == expectedAddress, "wrong addresses");
+        tbaAccount[_tokenId] = accountAddress;
+        _safeMint(_to, _tokenId);
+        _setTokenURI(_tokenId, _tokenURI);
+        loadBalance(payable(accountAddress), msg.value);
+        emit MintEvent(_tokenId, accountAddress);
+    }
+
+    function mint(
+        address _to,
+        uint256 _tokenId,
+        string memory _tokenURI,
+        bool _addPrivilege
+    ) external payable onlyRole(MINTER_ROLE) {
+        require(_tokenId > 0, "token id need > 0");
+        if (supply > 0) {
+            require(_tokenId < supply, "token id over supply");
+        }
+        uint256 salt = generateRandomSalt();
+        address accountAddress = erc6551Registry.createAccount(
+            address(this),
+            _tokenId,
+            salt
+        );
+        address expectedAddress = erc6551Registry.account(
+            address(this),
+            _tokenId,
+            salt
+        );
+        require(accountAddress == expectedAddress, "wrong addresses");
+        tbaAccount[_tokenId] = accountAddress;
+        _safeMint(_to, _tokenId);
+        _setTokenURI(_tokenId, _tokenURI);
+        loadBalance(payable(accountAddress), msg.value);
+        if (_addPrivilege) {
+            address[] memory a = new address[](1);
+            a[0] = _to;
+            addPrivilege(a);
+        }
+        emit MintEvent(_tokenId, accountAddress);
+    }
+
+    function setTokenURI(
+        uint256 _tokenId,
+        string memory _tokenURI
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setTokenURI(_tokenId, _tokenURI);
+    }
+
+    function tokenURI(
+        uint256 tokenId
+    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function setBaseUri(
+        string memory _baseUri
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        baseURI = _baseUri;
+    }
+
+    /**
+     * @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
+     * token will be the concatenation of the `baseURI` and the `tokenId`. Empty
+     * by default, can be overridden in child contracts.
+     */
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function generateRandomSalt() public view returns (uint256) {
+        bytes32 hash = keccak256(
+            abi.encodePacked(block.timestamp, msg.sender, nonce())
+        );
+        return uint256(hash);
+    }
+
+    function nonce() public pure returns (uint256) {
+        return 1;
+    }
+
+    function loadBalance(address payable to, uint256 amount) public {
+        (bool success, ) = to.call{value: amount}("");
+        require(success, "Failed to send Ether");
+    }
+
+    // address = ["0x0000000000000000000000000000000000000000"] 全部代付
+    function addPrivilege(
+        address[] memory _account
+    ) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
+        InternalContracts.SPONSOR_CONTROL.addPrivilege(_account);
+    }
+
+    function removePrivilege(
+        address[] memory _account
+    ) public payable onlyRole(DEFAULT_ADMIN_ROLE) {
+        InternalContracts.SPONSOR_CONTROL.removePrivilege(_account);
+    }
+
+    /**
+     * @dev See {IERC165-supportsInterface}.
+     */
+
+    function supportsInterface(
+        bytes4 interfaceId
+    )
+        public
+        view
+        override(
+            ERC721,
+            ERC721Enumerable,
+            ERC721URIStorage,
+            AccessControl,
+            MinimalReceiver
+        )
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    // The following functions are overrides required by Solidity.
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    )
+        internal
+        override(ERC721, ERC721Enumerable, ERC721Pausable)
+        returns (address)
+    {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(
+        address account,
+        uint128 value
+    ) internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, value);
+    }
+}
