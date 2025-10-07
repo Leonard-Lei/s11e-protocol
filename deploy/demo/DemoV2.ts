@@ -10,7 +10,7 @@ async function main() {
   console.log("账户余额:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
 
   // 代理合约地址（需要替换为实际部署的地址）
-  const PROXY_ADDRESS = process.env.DEMO_PROXY_ADDRESS || "0x694e79297D3642EB5e156DDca7ffc5Ee927e0D85";
+  const PROXY_ADDRESS = process.env.DEMO_PROXY_ADDRESS || "0x694e79297d3642eb5e156ddca7ffc5ee927e0d85";
 
   if (!PROXY_ADDRESS) {
     console.error("❌ 错误: 请设置环境变量 DEMO_PROXY_ADDRESS");

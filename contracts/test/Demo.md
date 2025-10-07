@@ -47,7 +47,8 @@ Demo 合约是一个简单的可升级合约示例，演示了如何使用 Hardh
 │   └── DemoV2.ts          # DemoV2 测试
 └── deploy/demo/
     ├── Demo.ts            # Demo V1 部署脚本
-    └── DemoV2.ts          # DemoV2 升级脚本
+    ├── DemoV2.ts          # DemoV2 升级脚本
+    └── DeployAndUpgrade.ts # 组合脚本（一次性部署和升级）
 ```
 
 ## 环境准备
@@ -76,6 +77,24 @@ import "@openzeppelin/hardhat-upgrades";
 ```bash
 MNEMONIC="your mnemonic phrase"
 INFURA_API_KEY="your infura api key"
+```
+
+### 4. 重要提示
+
+**关于 hardhat-deploy 插件**：
+
+本项目使用了 `hardhat-deploy` 插件，它会在 `npx hardhat node` 启动时**自动执行** `deploy/` 目录下的所有部署脚本。
+
+**问题**：这会导致多个脚本同时运行（Demo.ts、DemoV2.ts、DeployAndUpgrade.ts），造成冲突和错误。
+
+**解决**：使用 `--no-deploy` 标志禁用自动部署：
+
+```bash
+# ✅ 正确方式
+npx hardhat node --no-deploy
+
+# ❌ 错误方式（会自动执行所有部署脚本）
+npx hardhat node
 ```
 
 ## 合约代码说明
@@ -277,18 +296,103 @@ describe("Demo", function () {
 
 ## 部署流程
 
-### 方式一：使用部署脚本（推荐）
+### 方式一：使用组合脚本（推荐 ⭐）
+
+**最简单的方式**：使用 `DeployAndUpgrade.ts` 在一次运行中完成部署和升级：
+
+```bash
+# 一次性完成 V1 部署和 V2 升级
+npx hardhat run deploy/demo/DeployAndUpgrade.ts --network hardhat
+```
+
+**为什么推荐这种方式**：
+
+- ✅ 一次运行完成所有操作
+- ✅ 不需要保存和设置代理地址
+- ✅ 完整演示部署和升级流程
+- ✅ 包含完整的验证和测试
+- ✅ 解决 Hardhat network 临时性问题
+
+**输出示例**：
+
+```
+==================== 开始部署和升级 Demo ====================
+
+部署账户: 0x11bcce753392Ef20F69F9EcF8F09419292dfE464
+账户余额: 10000.0 ETH
+
+【第一步】部署 Demo V1...
+
+初始值: 42
+正在部署 Demo 代理合约...
+
+✅ Demo V1 代理合约部署成功!
+代理合约地址: 0x694e79297D3642EB5e156DDca7ffc5Ee927e0D85
+V1 实现合约地址: 0x693967F0eb2F94b2557D0967697510546DdF22d7
+管理员合约地址: 0xa2C12E271D61676425833D86C1f81cC1E296f8dE
+
+验证 V1 部署...
+存储的值: 42
+
+测试 V1 store 功能...
+store 后的值: 100
+✅ V1 功能测试成功!
+
+【第二步】升级到 DemoV2...
+
+升级前存储的值: 100
+
+检查升级兼容性...
+✅ 升级兼容性检查通过
+
+正在升级合约到 V2...
+✅ 合约升级成功!
+V2 实现合约地址: 0x8A6734C4cDf858d8593B230Cefa6419E5Cf04EDc
+
+验证升级...
+升级后存储的值: 100
+✅ 状态保留验证成功!
+
+测试 V2 新增的 increment 功能...
+increment 后的值: 101
+✅ increment 功能测试成功!
+
+测试多次 increment...
+最终值: 103
+
+==================== 部署和升级信息汇总 ====================
+网络: hardhat
+代理合约地址: 0x694e79297D3642EB5e156DDca7ffc5Ee927e0D85
+V1 实现合约地址: 0x693967F0eb2F94b2557D0967697510546DdF22d7
+V2 实现合约地址: 0x8A6734C4cDf858d8593B230Cefa6419E5Cf04EDc
+管理员合约地址: 0xa2C12E271D61676425833D86C1f81cC1E296f8dE
+
+值的变化:
+  初始值: 42
+  store 后: 100
+  升级后: 100  ← 状态保留成功
+  最终值: 103  ← increment 功能正常
+
+V2 新增功能: increment()
+===========================================================
+```
+
+### 方式二：分步部署脚本
+
+**适用场景**：生产环境，需要在不同时间部署和升级。
+
+**注意**：Hardhat network 是临时的，每次运行会重启。如需分步部署，请使用 localhost 或测试网。
 
 #### 1. 部署 Demo V1
 
 ```bash
-# 部署到本地 Hardhat 网络
-npx hardhat run deploy/demo/Demo.ts --network hardhat
+# 启动持久化节点（终端1，保持运行，禁用自动部署）
+npx hardhat node --no-deploy
 
-# 部署到 localhost（需要先运行 npx hardhat node）
+# 部署到 localhost（终端2）
 npx hardhat run deploy/demo/Demo.ts --network localhost
 
-# 部署到 Sepolia 测试网
+# 或部署到 Sepolia 测试网
 npx hardhat run deploy/demo/Demo.ts --network sepolia
 ```
 
@@ -330,15 +434,20 @@ npx hardhat run deploy/demo/Demo.ts --network sepolia
 
 #### 2. 升级到 DemoV2
 
+**重要**：使用步骤1中保存的代理合约地址！
+
 ```bash
 # 设置环境变量（代理合约地址）
 export DEMO_PROXY_ADDRESS=0xABCD...
 
-# 升级合约
-npx hardhat run deploy/demo/DemoV2.ts --network hardhat
+# 升级合约（使用相同网络）
+npx hardhat run deploy/demo/DemoV2.ts --network localhost
 
 # 或者一行命令
-DEMO_PROXY_ADDRESS=0xABCD... npx hardhat run deploy/demo/DemoV2.ts --network hardhat
+DEMO_PROXY_ADDRESS=0xABCD... npx hardhat run deploy/demo/DemoV2.ts --network localhost
+
+# 测试网升级
+DEMO_PROXY_ADDRESS=0xABCD... npx hardhat run deploy/demo/DemoV2.ts --network sepolia
 ```
 
 **输出示例**:
@@ -383,12 +492,21 @@ increment 后的值: 101
 ====================================================
 ```
 
-### 方式二：使用 Hardhat Console
+### 方式三：使用 Hardhat Console
 
 #### 1. 启动 Console
 
+**注意**：先启动本地节点（如果使用 localhost）
+
 ```bash
+# 终端1：启动节点（可选）
+npx hardhat node --no-deploy
+
+# 终端2：启动 console
 npx hardhat console --network localhost
+
+# 或者直接使用 hardhat network（无需启动节点）
+npx hardhat console --network hardhat
 ```
 
 #### 2. 部署 Demo V1
@@ -431,48 +549,114 @@ await demoV2.increment();
 console.log("increment 后:", await demoV2.retrieve());
 ```
 
-### 方式三：编程方式部署
+## 常见部署问题
 
-创建自定义脚本：
+### 问题1：DemoV2 升级失败 - "could not decode result data"
 
-```typescript
-import { ethers, upgrades } from "hardhat";
+**错误信息**:
 
-async function deployAndUpgrade() {
-  // 1. 部署 V1
-  console.log("部署 Demo V1...");
-  const Demo = await ethers.getContractFactory("Demo");
-  const demo = await upgrades.deployProxy(Demo, [42], {
-    initializer: "initialize",
-  });
-  await demo.waitForDeployment();
-  const proxyAddress = await demo.getAddress();
-  console.log("代理地址:", proxyAddress);
-
-  // 2. 使用 V1
-  await demo.store(100);
-  console.log("V1 存储的值:", await demo.retrieve());
-
-  // 3. 升级到 V2
-  console.log("\n升级到 DemoV2...");
-  const DemoV2 = await ethers.getContractFactory("DemoV2");
-  const demoV2 = await upgrades.upgradeProxy(proxyAddress, DemoV2);
-  console.log("升级后的值:", await demoV2.retrieve());
-
-  // 4. 使用 V2 新功能
-  await demoV2.increment();
-  console.log("increment 后:", await demoV2.retrieve());
-
-  return { proxyAddress, demo: demoV2 };
-}
-
-deployAndUpgrade()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
 ```
+Error: could not decode result data (value="0x", info={ "method": "retrieve" })
+```
+
+**原因**:
+
+- Hardhat network 是临时的，每次运行脚本都会重启
+- 单独运行 DemoV2.ts 时找不到之前部署的 Demo V1
+
+**解决方案**:
+
+1. ✅ **使用组合脚本**（推荐）:
+
+   ```bash
+   npx hardhat run deploy/demo/DeployAndUpgrade.ts --network hardhat
+   ```
+
+2. **使用 localhost network**:
+
+   ```bash
+   # 终端1：启动持久化节点（禁用自动部署）
+   npx hardhat node --no-deploy
+
+   # 终端2：部署和升级
+   npx hardhat run deploy/demo/Demo.ts --network localhost
+   DEMO_PROXY_ADDRESS=<地址> npx hardhat run deploy/demo/DemoV2.ts --network localhost
+   ```
+
+3. **使用测试网**:
+   ```bash
+   npx hardhat run deploy/demo/Demo.ts --network sepolia
+   DEMO_PROXY_ADDRESS=<地址> npx hardhat run deploy/demo/DemoV2.ts --network sepolia
+   ```
+
+### 问题2：找不到 upgrades 模块
+
+**错误信息**:
+
+```
+Module '"hardhat"' has no exported member 'upgrades'.
+```
+
+**解决方案**:
+
+1. 安装插件:
+
+   ```bash
+   npm install --save-dev @openzeppelin/hardhat-upgrades
+   ```
+
+2. 在 `hardhat.config.ts` 中添加:
+
+   ```typescript
+   import "@openzeppelin/hardhat-upgrades";
+   ```
+
+3. 修改导入方式:
+   ```typescript
+   import { ethers } from "hardhat";
+   import { upgrades } from "hardhat";
+   ```
+
+### 问题3：npx hardhat node 启动时自动部署报错
+
+**错误信息**:
+
+```
+Error: could not decode result data (value="0x", info={ "method": "retrieve" })
+```
+
+同时看到多个部署脚本同时运行（Demo.ts, DemoV2.ts, DeployAndUpgrade.ts）
+
+**原因**:
+
+- `hardhat-deploy` 插件会在 `npx hardhat node` 启动时自动执行 `deploy/` 目录下的所有脚本
+- DemoV2.ts 需要已存在的代理地址，但此时还没有部署
+
+**解决方案**:
+
+使用 `--no-deploy` 标志禁用自动部署：
+
+```bash
+npx hardhat node --no-deploy
+```
+
+然后在另一个终端手动部署：
+
+```bash
+npx hardhat run deploy/demo/Demo.ts --network localhost
+```
+
+### 问题4：状态丢失
+
+**问题**: 升级后读取的值不对
+
+**原因**: 存储布局不兼容
+
+**解决方案**:
+
+- 使用 `upgrades.validateUpgrade()` 验证
+- 保持状态变量顺序不变
+- 新变量添加在末尾
 
 ## 核心概念
 
@@ -551,6 +735,14 @@ contract DemoV2 {
   uint256 private _value;
 }
 ```
+
+## 部署方式对比
+
+| 方式         | 优点                     | 缺点                       | 适用场景       |
+| ------------ | ------------------------ | -------------------------- | -------------- |
+| **组合脚本** | 简单、一次完成、自动验证 | 不能分步执行               | 开发测试、演示 |
+| **分步脚本** | 灵活、可在不同时间执行   | 需要保存地址、需持久化网络 | 生产部署、升级 |
+| **Console**  | 交互式、即时反馈         | 手动操作多                 | 调试、实验     |
 
 ## 常见问题和解决方案
 
@@ -759,15 +951,55 @@ function executeUpgrade() public onlyOwner {
 - [可升级合约指南](../../doc/UpgradwableContract.md)
 - [StandardERC20 文档](../extensions/token/standard/StandardERC20.md)
 
+## 快速开始
+
+### 5 分钟快速体验
+
+```bash
+# 1. 确保已安装依赖
+npm install
+
+# 2. 运行测试（查看完整功能）
+npx hardhat test test/demo/Demo.ts test/demo/DemoV2.ts
+
+# 3. 部署和升级（一次完成，推荐）
+npx hardhat run deploy/demo/DeployAndUpgrade.ts --network hardhat
+```
+
+### 常用命令速查
+
+| 命令                                                                                 | 说明                       |
+| ------------------------------------------------------------------------------------ | -------------------------- |
+| `npx hardhat test test/demo/Demo.ts`                                                 | 运行 Demo V1 测试          |
+| `npx hardhat test test/demo/DemoV2.ts`                                               | 运行 DemoV2 测试           |
+| `npx hardhat run deploy/demo/DeployAndUpgrade.ts --network hardhat`                  | 一次性部署和升级           |
+| `npx hardhat node --no-deploy`                                                       | 启动本地节点（不自动部署） |
+| `npx hardhat run deploy/demo/Demo.ts --network localhost`                            | 部署 V1 到 localhost       |
+| `DEMO_PROXY_ADDRESS=0x... npx hardhat run deploy/demo/DemoV2.ts --network localhost` | 升级到 V2                  |
+
+### 完整流程
+
+```bash
+# 1. 启动本地节点（终端1，保持运行）
+npx hardhat node --no-deploy
+
+# 2. 部署 V1（终端2）
+npx hardhat run deploy/demo/Demo.ts --network localhost
+# 保存输出的代理地址
+
+# 3. 升级到 V2（终端2）
+DEMO_PROXY_ADDRESS=<代理地址> npx hardhat run deploy/demo/DemoV2.ts --network localhost
+```
+
 ## 总结
 
 本指南完整介绍了：
 
 1. ✅ Demo 合约的结构和功能
-2. ✅ 完整的测试套件（29 个测试）
-3. ✅ 三种部署方式（脚本、Console、编程）
+2. ✅ 完整的测试套件（24 个测试）
+3. ✅ 三种部署方式（组合脚本、分步脚本、Console）
 4. ✅ 升级流程和注意事项
-5. ✅ 常见问题和解决方案
+5. ✅ 常见问题和解决方案（包含部署问题）
 6. ✅ 最佳实践和安全建议
 7. ✅ 进阶主题（UUPS、条件升级、时间锁）
 
