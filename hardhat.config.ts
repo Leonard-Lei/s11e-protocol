@@ -27,6 +27,8 @@ const chainIds = {
   "polygon-mainnet": 137,
   "polygon-mumbai": 80001,
   sepolia: 11155111,
+  "bsc-testnet": 97,
+  "bsc-mainnet": 56,
 };
 
 function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
@@ -42,11 +44,15 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
   return {
-    accounts: {
-      count: 10,
-      mnemonic,
-      path: "m/44'/60'/0'/0",
-    },
+    // bsc账户使用私钥,其他账户使用助记词
+    accounts:
+      chain === "bsc-testnet" || chain === "bsc-mainnet"
+        ? [process.env.BSC_EOA_PRIVATE_KEY || ""]
+        : {
+            count: 10,
+            mnemonic,
+            path: "m/44'/60'/0'/0",
+          },
     chainId: chainIds[chain],
     url: jsonRpcUrl,
   };
@@ -97,6 +103,8 @@ const config: HardhatUserConfig = {
     "polygon-mainnet": getChainConfig("polygon-mainnet"),
     "polygon-mumbai": getChainConfig("polygon-mumbai"),
     sepolia: getChainConfig("sepolia"),
+    "bsc-testnet": getChainConfig("bsc-testnet"),
+    "bsc-mainnet": getChainConfig("bsc-mainnet"),
   },
   paths: {
     artifacts: "./artifacts",
